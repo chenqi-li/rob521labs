@@ -117,7 +117,15 @@ class PathPlanner:
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
         #point is a 2 by N matrix of points of interest
         print("TO DO: Implement a method to get the map cell the robot is currently occupying")
-        return 0
+
+        # Convert from [x,y] points in map frame to occupancy_map pixel coordinates
+        origin = np.asarray(self.map_settings_dict['origin'][:2]).reshape(2,-1)
+        resolution = self.map_settings_dict['resolution']
+        indices = (point-origin)/resolution # get indices
+        # Occupancy map origin is top left, but map points origin bottom left
+        indices[1,:] = self.map_shape[1]-indices[1,:] 
+
+        return indices.astype(int)
 
     def points_to_robot_circle(self, points):
         #Convert a series of [x,y] points to robot map footprints for collision detection
@@ -222,6 +230,21 @@ def main():
     #Leftover test functions
     np.save("shortest_path.npy", node_path_metric)
 
+    # Test point_to_cell
+    print("Chenqi: Test point_to_cell function")
+    point = np.array([[0, 0,  10, -10, -20],
+                      [0, 10, 10, -10, -48.25]])
+    print(point, '\n', path_planner.point_to_cell(point))
+    for i in point.T:
+        path_planner.window.add_point(i, radius=2, color=(0, 0, 255))
+
+    # Keep pygame running
+    while True:
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
 
 if __name__ == '__main__':
     main()
