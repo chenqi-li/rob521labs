@@ -110,8 +110,19 @@ class PathPlanner:
     def trajectory_rollout(self, vel, rot_vel):
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
         # The returned trajectory should be a series of points to check for collisions
-        print("TO DO: Implement a way to rollout the controls chosen")
-        return np.zeros((3, self.num_substeps))
+        # print("TO DO: Implement a way to rollout the controls chosen")
+        p = np.asarray([vel,rot_vel]).T
+        point_list = np.array(3,num_substeps+1)
+        point_list[0,:] = self.nodes[closest_node_id].point # inferred from elsewhere in the code
+        substep_size = self.num_substeps / self.timestep
+        for i in range(0,num_substeps):
+            theta = point_list[i,2]
+            G = np.asarray([[np.cos(theta), 0],
+                            [np.sin(theta), 0],
+                            [0, 1]])
+            q_dot = np.matmul(G,p)
+            point_list[i+1,:] = point_list[i,:] + q_dot*substep_size
+        return point_list
     
     def point_to_cell(self, point):
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
