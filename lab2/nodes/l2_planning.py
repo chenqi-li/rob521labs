@@ -178,14 +178,21 @@ class PathPlanner:
     def points_to_robot_circle(self, points):
         #Convert a series of [x,y] points to robot map footprints for collision detection
         #Hint: The disk function is included to help you with this function
-        #print("TO DO: Implement a method to get the pixel locations of the robot path")
+        print("TO DO: Implement a method to get the pixel locations of the robot path")
+
         centers = self.point_to_cell(points)
-        radius = self.robot_radius/self.resolution
+        origin = self.point_to_cell([[0],[0]])
+        centers[1,:] = abs(centers[1,:] - 2*origin[1,:])
+        new_centers = np.vstack([centers[1,:], centers[0,:]])
+        centers = new_centers
+
+        radius = np.ceil(self.robot_radius/self.resolution).astype(int)
         occupancy_grid = np.zeros((self.map_shape))
-        for i in range(points.shape[1],radius,self.map_shape):
-            rr, cc = disk(centers[:,i])
-            occupancy_grid[cc,rr] = 1
+        for i in range(centers.shape[1]):
+            rr, cc = disk(centers[:,i],radius,shape=self.map_shape)
+            occupancy_grid[rr,cc] = 1
         pixel_idxs = np.argwhere(occupancy_grid == 1).T
+
         return occupancy_grid, pixel_idxs
 
     # occupancy_grid is the np array of the occupancy grid with points on the robot path equal to one (assumes x-axis along rows and y-axis along columns)
