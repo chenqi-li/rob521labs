@@ -50,6 +50,9 @@ class PathPlanner:
         self.robot_radius = 0.22 #m
         self.vel_max = 0.5 #m/s (Feel free to change!)
         self.rot_vel_max = 0.2 #rad/s (Feel free to change!)
+        
+        #Map information (for convenience)
+        self.resolution = 0.05 #m/cell (Occupancy Grid Resolution)
 
         #Goal Parameters
         self.goal_point = goal_point #m
@@ -142,7 +145,20 @@ class PathPlanner:
         #Convert a series of [x,y] points to robot map footprints for collision detection
         #Hint: The disk function is included to help you with this function
         print("TO DO: Implement a method to get the pixel locations of the robot path")
-        return [], []
+        centers = self.point_to_cell(points)
+        radius = self.robot_radius/self.resolution
+        occupancy_grid = np.zeros((self.map_shape))
+        for i in range(centers.shape[1],radius,self.map_shape):
+            rr, cc = disk(centers[:,i])
+            occupancy_grid[rr,cc] = 1
+        pixel_idxs = np.argwhere(occupancy_grid == 1).T
+        return occupancy_grid, pixel_idxs
+
+    # occupancy_grid is the np array of the occupancy grid with points on the robot path equal to one (assumes x-axis along rows and y-axis along columns)
+    # Add a transpose if it needs to be flipped
+
+    # pixel_idx is a 2xN np array of indices of the occupancy_grid that are equal to one (occupied)
+    
     #Note: If you have correctly completed all previous functions, then you should be able to create a working RRT function
 
     #RRT* specific functions
