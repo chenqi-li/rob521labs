@@ -109,81 +109,41 @@ class PathPlanner:
         #Max velocities should be enforced
         # print("TO DO: Implement a control scheme to drive you towards the sampled point")
 
-        # x_i, y_i, theta_i = node_i
-        # x_s, y_s, theta_s = point_s
-
-        # dx = x_s - x_i
-        # dy = y_s - y_i
-        # dist = np.sqrt(dx**2 + dy**2)
-        # angle = np.arctan2(dy, dx)
-
-
-        # #assuming nodes close together - using euclidean distance
-        # angular_vel = (angle - theta_i) / self.timestep
-        # linear_vel = dist / self.timestep
-
-        # ratio = angular_vel / linear_vel
-
-        # if angular_vel > self.rot_vel_max:
-        #     angular_vel = self.rot_vel_max
-        #     linear_vel = angular_vel / ratio
-        # elif angular_vel < -self.rot_vel_max:
-        #     angular_vel = -self.rot_vel_max
-        #     linear_vel = angular_vel / ratio
-        # elif linear_vel > self.vel_max:
-        #     linear_vel = self.vel_max
-        #     angular_vel = linear_vel * ratio
-        # elif linear_vel < -self.vel_max:
-        #     linear_vel = -self.vel_max
-        #     angular_vel = linear_vel * ratio
-        # return linear_vel, angular_vel
-
-        #if not assuming can do a more differential drive model
-        # Extract the current position and orientation from node_i
         x_i, y_i, theta_i = node_i
-
-        # Extract the target position and orientation from point_s
         x_s, y_s, theta_s = point_s
 
-        v = 0.024/ 2   * (theta_s - theta_i) / self.timestep
-        w = 0.024/self.robot_radius * (theta_s - theta_i) / self.timestep
+        dx = x_s - x_i
+        dy = y_s - y_i
+        dist = np.sqrt(dx**2 + dy**2)
 
-        ratio = w / v
+        #assuming nodes close together - using euclidean distance
+        angular_vel = (theta_s - theta_i) / self.timestep
+        linear_vel = dist / self.timestep
 
-        if w > self.rot_vel_max:
-            w = self.rot_vel_max
-            v = w / ratio
-        elif w < -self.rot_vel_max:
-            w = -self.rot_vel_max
-            v = w / ratio
-        elif v > self.vel_max:
-            v = self.vel_max
-            w = v * ratio
-        elif v < -self.vel_max:
-            v = -self.vel_max
-            w = v * ratio
-        
-        return v, w
+        ratio = angular_vel / linear_vel
 
+        if angular_vel > self.rot_vel_max:
+            angular_vel = self.rot_vel_max
+            linear_vel = angular_vel / ratio
+        elif angular_vel < -self.rot_vel_max:
+            angular_vel = -self.rot_vel_max
+            linear_vel = angular_vel / ratio
+        if linear_vel > self.vel_max:
+            linear_vel = self.vel_max
+            angular_vel = linear_vel * ratio
+        elif linear_vel < -self.vel_max:
+            linear_vel = -self.vel_max
+            angular_vel = linear_vel * ratio
+        return linear_vel, angular_vel
 
-
-
-
-
-    
     def trajectory_rollout(self, vel, rot_vel):
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
         # The returned trajectory should be a series of points to check for collisions
         # print("TO DO: Implement a way to rollout the controls chosen")
         p = np.asarray([vel,rot_vel]).T
-        point_list = np.array(3, self.num_substeps + 1)
-
-        " closest_node_id is not defined"
-        "closest_node_id = self.closest_node(point_s) - where point_s is your next point"
-        "I also changed num_substeps to self.num_substeps"
-        "-Morgan"
-        point_list[0,:] = self.nodes[closest_node_id].point # inferred from elsewhere in the code
+        point_list = np.zeros([3, self.num_substeps+1])
         substep_size = self.num_substeps / self.timestep
+
         for i in range(0, self.num_substeps):
             theta = point_list[i,2]
             G = np.asarray([[np.cos(theta), 0],
@@ -191,7 +151,7 @@ class PathPlanner:
                             [0, 1]])
             q_dot = np.matmul(G,p)
             point_list[i+1,:] = point_list[i,:] + q_dot*substep_size
-        return point_list
+        return point_list[3,1:]
     
     def point_to_cell(self, point):
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
