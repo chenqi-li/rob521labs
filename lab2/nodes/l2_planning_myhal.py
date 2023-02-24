@@ -4,7 +4,7 @@ import numpy as np
 import yaml
 import pygame
 import time
-import pygame_utils
+import pygame_utils_myhal
 import matplotlib.image as mpimg
 from skimage.draw import disk
 from scipy.linalg import block_diag
@@ -15,8 +15,8 @@ import copy
 #Map Handling Functions
 def load_map(filename):
     im = mpimg.imread("../maps/" + filename)
-    im_np = np.array(im)  #Whitespace is true, black is false
-    #im_np = np.logical_not(im_np)    
+    im_np = np.array(im[:,:,0])  #Whitespace is true, black is false
+    #im_np = np.logical_not(im_np)
     return im_np
 
 def load_map_yaml(filename):
@@ -79,9 +79,9 @@ class PathPlanner:
         self.lowest_togo = np.inf
         
         #Pygame window for visualization
-        self.window = pygame_utils.PygameWindow(
-            "Path Planner", (900, 900), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
-        # print('wait for 1 sec')
+        self.window = pygame_utils_myhal.PygameWindow(
+            "Path Planner", (1590, 490), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
+        # print('wait for 1 sec') (795, 245)
         # time.sleep(1)
         return
 
@@ -91,16 +91,16 @@ class PathPlanner:
         #print("TO DO: Sample point to drive towards")
 
         # Define the bounds to sample from
-        largest_bounds = np.array([[0, 44], 
-                      [-46, 10]])
+        largest_bounds = np.array([[-0.2, 7.5], 
+                      [-0.2,3]])
         own_bounds = largest_bounds
 
         # Dynamic window to sample from, help reach goal in small room faster, remove for RSTAR if needed
         if self.goal_point[0] > 100 or self.goal_point[1] > 100:
             own_bounds = largest_bounds
         else:
-            new_low_x = (self.goal_point[0] - self.lowest_togo*1.7)
-            new_low_y = (self.goal_point[1] + self.lowest_togo*1.7)
+            new_low_x = (self.goal_point[0] - self.lowest_togo*1.5)
+            new_low_y = (self.goal_point[1] + self.lowest_togo*1.5)
             own_bounds = np.array([[max(largest_bounds[0,0], new_low_x), largest_bounds[0,1]],
                             [largest_bounds[1,0], min(largest_bounds[1,1], new_low_y)]])
 
@@ -323,20 +323,20 @@ class PathPlanner:
         mid_point = node_i[0:2].reshape(2,1) + direction*np.asarray([[desired_dist*np.cos(pose_angle)],[desired_dist*np.sin(pose_angle)]])
 
         # Get final trajectory
-        traj = self.bezier_curve(np.hstack([node_i[0:2].reshape(2,-1), mid_point, point_f.reshape(2,-1)]).T, self.num_substeps)
+        traj = self.bezier_curve(np.hstack([node_i[0:2].reshape(2,-1), mid_point, point_f.reshape(2,-1)]).T, self.num_substeps*10)
         return traj
 
     def cost_to_come(self, trajectory_o):
         #The cost to get to a node from lavalle 
         # print("TO DO: Implement a cost to come metric")
         
-        # # Calculate the whole trajectory length
-        # traj_dist = 0
-        # for i in range(1,trajectory_o.shape[1]):
-        #     traj_dist += np.linalg.norm(trajectory_o[0:2, i-1].reshape(2,1) - trajectory_o[0:2, i].reshape(2,1))
+        # Calculate the whole trajectory length
+        traj_dist = 0
+        for i in range(1,trajectory_o.shape[1]):
+            traj_dist += np.linalg.norm(trajectory_o[0:2, i-1].reshape(2,1) - trajectory_o[0:2, i].reshape(2,1))
         
-        # Pure euclidean distance between end points
-        traj_dist = np.linalg.norm(trajectory_o[0:2, 0].reshape(2,1) - trajectory_o[0:2, -1].reshape(2,1))
+        # # Pure euclidean distance between end points
+        # traj_dist = np.linalg.norm(trajectory_o[0:2, 0].reshape(2,1) - trajectory_o[0:2, -1].reshape(2,1))
         return traj_dist
     
     def update_children(self, node_id, cost_diff):
@@ -414,8 +414,6 @@ class PathPlanner:
         #This function performs RRT* for the given map and robot        
         while True: #Most likely need more iterations than this to complete the map!
             #Sample
-            new_node = None
-            lowest_cost = np.inf
             point = self.sample_map_space()
 
             #Closest Node
@@ -492,8 +490,8 @@ class PathPlanner:
                         self.nodes[neigh_node.parent_id].children_ids.remove(idx) # remove neigh_idx from neigh's parent's list of children
                         self.nodes[idx].parent_id = added_index # set neigh's parent to be new node
                         self.nodes[idx].cost = added_to_neigh_cost # update the rewired cost for neighbor
-                        self.nodes[added_index].children_ids.append(int(idx)) # tell the new parent node it has new child
-                        self.update_children(idx, neigh_node.cost-added_to_neigh_cost) # change children cost
+                        self.nodes[added_index].children_ids.append(int(idx))
+                        self.update_children(idx, neigh_node.cost-added_to_neigh_cost)
 
                         # Update the visualization with rewire
                         # self.window.add_line(np.copy(neigh_node.point[0:2].reshape(1,2).squeeze()), np.copy(added_node.point[0:2].reshape(1,2).squeeze()))
@@ -523,12 +521,12 @@ class PathPlanner:
 
 def main():
     #Set map information
-    map_filename = "willowgarageworld_05res.png"
-    map_setings_filename = "willowgarageworld_05res.yaml"
+    map_filename = "myhal.png"
+    map_setings_filename = "myhal.yaml"
 
     #robot information
-    goal_point = np.array([[41.2], [-44.2]]) #m np.array([[10], [0]]) #
-    stopping_dist = 1 #m
+    goal_point = np.array([[7], [0]]) #m
+    stopping_dist = 0.1 #m
     
 
     # Initialize Class
@@ -618,12 +616,12 @@ def main():
 
     # # Test point_to_cell
     # print("Chenqi: Test point_to_cell function")
-    # point = np.array([[0, 0,  10, -10, -20],
-    #                   [0, 10, 10, -10, -48.25]])
-    # point = np.array([[-11.00, 44.00], 
-    #                   [-44.25, 20.75]])
-    # # print(point, '\n', path_planner.point_to_cell(point))
-    # # path_planner.points_to_robot_circle(point)
+    # point = np.array([[0, 7, 1, -0.2],
+    #                   [0, 0, 1, -0.2]])
+    # # point = np.array([[-11.00, 44.00], 
+    # #                   [-44.25, 20.75]])
+    # print(point, '\n', path_planner.point_to_cell(point))
+    # path_planner.points_to_robot_circle(point)
     # for i in point.T:
     #     path_planner.window.add_point(i, radius=2, color=(0, 0, 255))
     #     print(path_planner)
