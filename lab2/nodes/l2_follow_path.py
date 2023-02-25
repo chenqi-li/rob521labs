@@ -28,7 +28,7 @@ COLLISION_RADIUS = 0.225  # m, radius from base_link to use for collisions, min 
 ROT_DIST_MULT = .1  # multiplier to change effect of rotational distance in choosing correct control
 OBS_DIST_MULT = .1  # multiplier to change the effect of low distance to obstacles on a path
 MIN_TRANS_DIST_TO_USE_ROT = TRANS_GOAL_TOL  # m, robot has to be within this distance to use rot distance in cost
-PATH_NAME = 'path.npy'  # saved path from l2_planning.py, should be in the same directory as this file
+PATH_NAME = 'shortest_path_02_23_23_43.npy'  # saved path from l2_planning.py, should be in the same directory as this file
 
 # here are some hardcoded paths to use if you want to develop l2_planning and this file in parallel
 # TEMP_HARDCODE_PATH = [[2, 0, 0], [2.75, -1, -np.pi/2], [2.75, -4, -np.pi/2], [2, -4.4, np.pi]]  # almost collision-free
@@ -122,13 +122,23 @@ class PathFollower():
             self.check_and_update_goal()
 
             # start trajectory rollout algorithm
-            local_paths = np.zeros([self.horizon_timesteps + 1, self.num_opts, 3])
+            local_paths = np.zeros([self.horizon_timesteps + 1, self.num_opts, 3]) # dims are time, control options, and pose params, in order.
             local_paths[0] = np.atleast_2d(self.pose_in_map_np).repeat(self.num_opts, axis=0)
 
-            print("TO DO: Propogate the trajectory forward, storing the resulting points in local_paths!")
-            for t in range(1, self.horizon_timesteps + 1):
-                # propogate trajectory forward, assuming perfect control of velocity and no dynamic effects
-                pass
+            #print("TO DO: Propogate the trajectory forward, storing the resulting points in local_paths!")
+            # propogate trajectory forward, assuming perfect control of velocity and no dynamic effects
+            for t in range(1, self.horizon_timesteps + 1): # for each timestep:
+                for i in range(0, self.num_opts): # for each control option:
+                    # Given your chosen velocities determine the trajectory of the robot for your given timestep
+                    # The returned trajectory should be a series of points to check for collisions
+                    p = self.all_opts_scaled[:,i]
+                    theta = local_paths[t,i,2]
+                    G = np.asarray([[np.cos(theta), 0],
+                                    [np.sin(theta), 0],
+                                    [0, 1]])
+                    q_dot = np.matmul(G,p)
+                    local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot
+                    #local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot.squeeze()
 
             # check all trajectory points for collisions
             # first find the closest collision point in the map to each local path point
