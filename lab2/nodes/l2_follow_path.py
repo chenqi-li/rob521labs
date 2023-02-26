@@ -145,21 +145,36 @@ class PathFollower():
             local_paths_pixels = (self.map_origin[:2] + local_paths[:, :, :2]) / self.map_resolution
             valid_opts = range(self.num_opts)
             local_paths_lowest_collision_dist = np.ones(self.num_opts) * 50
+            map_shape = (map.info.height, map.info.width)
 
-            print("TO DO: Check the points in local_path_pixels for collisions")
+            #print("TO DO: Check the points in local_path_pixels for collisions")
+            uncollided_opts = []
             for opt in range(local_paths_pixels.shape[1]):
+                occupancy_grid = np.zeros((map_shape))
                 for timestep in range(local_paths_pixels.shape[0]):
-                    pass
+                    point = local_path_pixels[timestep, opt, :]
+                    rr, cc = disk(centers[:,i],COLLISION_RADIUS,shape=map_shape)
+                    occupancy_grid[rr,cc] = 1
+                #pixel_idxs = np.argwhere(occupancy_grid == 1).T
+                if not np.any(occupancy_grid[self.map_nonzero_idxes]):
+                    uncollided_opts.append(opt)
 
             # remove trajectories that were deemed to have collisions
-            print("TO DO: Remove trajectories with collisions!")
+            #print("TO DO: Remove trajectories with collisions!")
+            valid_paths = local_paths[:,uncollided_opts,:]
+            valid_opts = valid_opts[uncollided_opts]
 
             # calculate final cost and choose best option
             print("TO DO: Calculate the final cost and choose the best control option!")
-            final_cost = np.zeros(self.num_opts)
+            final_cost = np.zeros(self.valid_opts)
             if final_cost.size == 0:  # hardcoded recovery if all options have collision
                 control = [-.1, 0]
             else:
+                for i in range(0,len(self.valid_opts)
+                    # add cost proportional to distance to waypoint
+                    final_point = local_paths[:,self.valid_opts[i],:2].reshape(1,2)
+                    final_cost[i] += np.linalg.norm(final_point - self.cur_goal[1,:2])
+
                 best_opt = valid_opts[final_cost.argmin()]
                 control = self.all_opts[best_opt]
                 self.local_path_pub.publish(utils.se2_pose_list_to_path(local_paths[:, best_opt], 'map'))
