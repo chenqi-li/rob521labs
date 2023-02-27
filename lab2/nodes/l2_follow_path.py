@@ -23,8 +23,8 @@ ROT_GOAL_TOL = .3  # rad, tolerance to consider a goal complete
 TRANS_VEL_OPTS = [0, 0.025, 0.13, 0.26]  # m/s, max of real robot is .26
 ROT_VEL_OPTS = np.linspace(-1.82, 1.82, 11)  # rad/s, max of real robot is 1.82
 CONTROL_RATE = 5  # Hz, how frequently control signals are sent
-CONTROL_HORIZON = 5  # seconds. if this is set too high and INTEGRATION_DT is too low, code will take a long time to run!
-INTEGRATION_DT = .025  # s, delta t to propagate trajectories forward by
+CONTROL_HORIZON = 4  # seconds. if this is set too high and INTEGRATION_DT is too low, code will take a long time to run!
+INTEGRATION_DT = .25  # s, delta t to propagate trajectories forward by
 COLLISION_RADIUS = 0.225  # m, radius from base_link to use for collisions, min of 0.2077 based on dimensions of .281 x .306
 ROT_DIST_MULT = .1  # multiplier to change effect of rotational distance in choosing correct control
 OBS_DIST_MULT = .1  # multiplier to change the effect of low distance to obstacles on a path
@@ -153,13 +153,16 @@ class PathFollower():
             print("TO DO: Check the points in local_path_pixels for collisions")
             uncollided_opts = []
             for opt in range(local_paths_pixels.shape[1]):
-                occupancy_grid = np.zeros((map_shape))
+                uncollided = True
                 for timestep in range(local_paths_pixels.shape[0]):
                     point = local_paths_pixels[timestep, opt, :]
                     rr, cc = disk(point,COLLISION_RADIUS,shape=map_shape)
-                    occupancy_grid[rr,cc] = 1
-                #pixel_idxs = np.argwhere(occupancy_grid == 1).T
-                if not np.any(occupancy_grid[self.map_nonzero_idxes]):
+                    if np.any(self.map_np[rr,cc]):
+                        #print("Option",opt,"is collided.")
+                        uncollided = False
+                        break
+                if uncollided:
+                    #print("Option",opt,"is uncollided.")
                     uncollided_opts.append(opt)
 
             # remove trajectories that were deemed to have collisions
@@ -173,14 +176,18 @@ class PathFollower():
             if final_cost.size == 0:  # hardcoded recovery if all options have collision
                 control = [-.1, 0]
             else:
+                print("Current goal is:",self.cur_goal[:2])
                 for i in range(0,len(valid_opts)):
                     # add cost proportional to distance to waypoint
-                    final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2)
+                    final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2) + self.map_origin[:2].reshape(1,2)
+                    #print("Final point for option",valid_opts[i],"is",final_point)
                     final_cost[i] += np.linalg.norm(final_point - self.cur_goal[:2].reshape(1,2))
-
+                
+                #print(final_cost)
                 best_opt = valid_opts[final_cost.argmin()]
                 control = self.all_opts[best_opt]
                 self.local_path_pub.publish(utils.se2_pose_list_to_path(local_paths[:, best_opt], 'map'))
+                print("Best option:",best_opt)
 
             # send command to robot
             self.cmd_pub.publish(utils.unicyle_vel_to_twist(control))
