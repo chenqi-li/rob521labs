@@ -7,6 +7,7 @@ from scipy.linalg import block_diag
 from scipy.spatial.distance import cityblock
 import rospy
 import tf2_ros
+from skimage.draw import disk
 
 # msgs
 from geometry_msgs.msg import TransformStamped, Twist, PoseStamped
@@ -85,7 +86,7 @@ class PathFollower():
         cur_dir = os.path.dirname(os.path.realpath(__file__))
 
         # to use the temp hardcoded paths above, switch the comment on the following two lines
-        self.path_tuples = np.load(os.path.join(cur_dir, 'path.npy')).T
+        self.path_tuples = np.load(os.path.join(cur_dir, PATH_NAME)).T
         # self.path_tuples = np.array(TEMP_HARDCODE_PATH)
 
         self.path = utils.se2_pose_list_to_path(self.path_tuples, 'map')
@@ -125,55 +126,57 @@ class PathFollower():
             local_paths = np.zeros([self.horizon_timesteps + 1, self.num_opts, 3]) # dims are time, control options, and pose params, in order.
             local_paths[0] = np.atleast_2d(self.pose_in_map_np).repeat(self.num_opts, axis=0)
 
-            #print("TO DO: Propogate the trajectory forward, storing the resulting points in local_paths!")
+            print("TO DO: Propogate the trajectory forward, storing the resulting points in local_paths!")
             # propogate trajectory forward, assuming perfect control of velocity and no dynamic effects
             for t in range(1, self.horizon_timesteps + 1): # for each timestep:
-                for i in range(0, self.num_opts): # for each control option:
+                for i in range(0, self.num_opts-1): # for each control option:
                     # Given your chosen velocities determine the trajectory of the robot for your given timestep
                     # The returned trajectory should be a series of points to check for collisions
-                    p = self.all_opts_scaled[:,i]
+                    p = self.all_opts_scaled[i,:].reshape(2,1)
                     theta = local_paths[t,i,2]
                     G = np.asarray([[np.cos(theta), 0],
                                     [np.sin(theta), 0],
                                     [0, 1]])
                     q_dot = np.matmul(G,p)
-                    local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot
-                    #local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot.squeeze()
+                    #print(q_dot)
+                    #print(local_paths[t,i,:])
+                    #local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot
+                    local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot.squeeze()
 
             # check all trajectory points for collisions
             # first find the closest collision point in the map to each local path point
             local_paths_pixels = (self.map_origin[:2] + local_paths[:, :, :2]) / self.map_resolution
             valid_opts = range(self.num_opts)
             local_paths_lowest_collision_dist = np.ones(self.num_opts) * 50
-            map_shape = (map.info.height, map.info.width)
+            map_shape = self.map_np.shape
 
-            #print("TO DO: Check the points in local_path_pixels for collisions")
+            print("TO DO: Check the points in local_path_pixels for collisions")
             uncollided_opts = []
             for opt in range(local_paths_pixels.shape[1]):
                 occupancy_grid = np.zeros((map_shape))
                 for timestep in range(local_paths_pixels.shape[0]):
-                    point = local_path_pixels[timestep, opt, :]
-                    rr, cc = disk(centers[:,i],COLLISION_RADIUS,shape=map_shape)
+                    point = local_paths_pixels[timestep, opt, :]
+                    rr, cc = disk(point,COLLISION_RADIUS,shape=map_shape)
                     occupancy_grid[rr,cc] = 1
                 #pixel_idxs = np.argwhere(occupancy_grid == 1).T
                 if not np.any(occupancy_grid[self.map_nonzero_idxes]):
                     uncollided_opts.append(opt)
 
             # remove trajectories that were deemed to have collisions
-            #print("TO DO: Remove trajectories with collisions!")
+            print("TO DO: Remove trajectories with collisions!")
             valid_paths = local_paths[:,uncollided_opts,:]
-            valid_opts = valid_opts[uncollided_opts]
+            valid_opts = [valid_opts[idx] for idx in uncollided_opts]
 
             # calculate final cost and choose best option
             print("TO DO: Calculate the final cost and choose the best control option!")
-            final_cost = np.zeros(self.valid_opts)
+            final_cost = np.zeros(len(valid_opts))
             if final_cost.size == 0:  # hardcoded recovery if all options have collision
                 control = [-.1, 0]
             else:
-                for i in range(0,len(self.valid_opts)
+                for i in range(0,len(valid_opts)):
                     # add cost proportional to distance to waypoint
-                    final_point = local_paths[:,self.valid_opts[i],:2].reshape(1,2)
-                    final_cost[i] += np.linalg.norm(final_point - self.cur_goal[1,:2])
+                    final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2)
+                    final_cost[i] += np.linalg.norm(final_point - self.cur_goal[:2].reshape(1,2))
 
                 best_opt = valid_opts[final_cost.argmin()]
                 control = self.all_opts[best_opt]
@@ -183,8 +186,8 @@ class PathFollower():
             self.cmd_pub.publish(utils.unicyle_vel_to_twist(control))
 
             # uncomment out for debugging if necessary
-            # print("Selected control: {control}, Loop time: {time}, Max time: {max_time}".format(
-            #     control=control, time=(rospy.Time.now() - tic).to_sec(), max_time=1/CONTROL_RATE))
+            print("Selected control: {control}, Loop time: {time}, Max time: {max_time}".format(
+                control=control, time=(rospy.Time.now() - tic).to_sec(), max_time=1/CONTROL_RATE))
 
             self.rate.sleep()
 
