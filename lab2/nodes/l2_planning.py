@@ -199,6 +199,11 @@ class PathPlanner:
         # If angular velocity larger than max, set to max
         angular_vel = np.clip(angular_vel, -self.rot_vel_max, self.rot_vel_max)
 
+        # If we only want to move forward, remove negative velocity components
+        if linear_vel < 0:
+            linear_vel = 0
+            angular_vel = 0
+
         return linear_vel, angular_vel
 
 
@@ -534,16 +539,16 @@ def main():
     # Initialize Class
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist)
 
-    # # #RRT Test
-    # start_time = time.time()
-    # nodes = path_planner.rrt_planning()
-    # end_time = time.time()
-    # print(f'Time to goal: {end_time-start_time}')
-    # node_path_metric = np.hstack(path_planner.recover_path())
-    # np.save("shortest_path.npy", node_path_metric)
-    # print(node_path_metric)
-    # for i in range(1, node_path_metric.shape[1]):
-    #     path_planner.window.add_point(node_path_metric[:2,i], radius=1, color=(255, 0, 0))
+    # #RRT Test
+    start_time = time.time()
+    nodes = path_planner.rrt_planning()
+    end_time = time.time()
+    print(f'Time to goal: {end_time-start_time}')
+    node_path_metric = np.hstack(path_planner.recover_path())
+    np.save("shortest_path.npy", node_path_metric)
+    print(node_path_metric)
+    for i in range(1, node_path_metric.shape[1]):
+        path_planner.window.add_point(node_path_metric[:2,i], radius=1, color=(255, 0, 0))
 
     # # Connect Node to Point and Cost to Come Test
     # init_angle = 3/5*np.pi
@@ -559,17 +564,17 @@ def main():
     # plt.imshow(occupied_cells)
     # plt.show()
 
-    # #RRT* Test
-    start_time = time.time()
-    nodes = path_planner.rrt_star_planning()
-    end_time = time.time()
-    print(f'Time to goal: {end_time-start_time}')
-    node_path_metric = np.hstack(path_planner.recover_path())
-    np.save("shortest_path.npy", node_path_metric)
-    print(node_path_metric)
-    for i in range(1, node_path_metric.shape[1]):
-        path_planner.window.add_point(np.copy(node_path_metric[:2,i]), radius=3, color=(255, 0, 0))
-        path_planner.window.add_line(np.copy(node_path_metric[:2,i-1]),np.copy(node_path_metric[:2,i]), width = 2)
+    # # #RRT* Test
+    # start_time = time.time()
+    # nodes = path_planner.rrt_star_planning()
+    # end_time = time.time()
+    # print(f'Time to goal: {end_time-start_time}')
+    # node_path_metric = np.hstack(path_planner.recover_path())
+    # np.save("shortest_path.npy", node_path_metric)
+    # print(node_path_metric)
+    # for i in range(1, node_path_metric.shape[1]):
+    #     path_planner.window.add_point(np.copy(node_path_metric[:2,i]), radius=3, color=(255, 0, 0))
+    #     path_planner.window.add_line(np.copy(node_path_metric[:2,i-1]),np.copy(node_path_metric[:2,i]), width = 2)
 
     # #Simulate Trajectory Test
     # traj1 = path_planner.trajectory_rollout(np.array([0,0,0]),1,0.2)
