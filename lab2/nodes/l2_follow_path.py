@@ -163,12 +163,14 @@ class PathFollower():
                 if uncollided:
                     #print("Option",opt,"is uncollided.")
                     uncollided_opts.append(opt)
+            print("uncollided opts:",len(uncollided_opts))
+            print("collided opts:",self.num_opts - len(uncollided_opts))
 
             # remove trajectories that were deemed to have collisions
             print("TO DO: Remove trajectories with collisions!")
             #valid_paths = local_paths[:,uncollided_opts,:]
             valid_opts = [valid_opts[idx] for idx in uncollided_opts]
-            print("valid_opts",valid_opts)
+            #print("valid_opts",valid_opts)
 
             # calculate final cost and choose best option
             print("TO DO: Calculate the final cost and choose the best control option!")
@@ -182,8 +184,8 @@ class PathFollower():
                 for i in range(0,len(valid_opts)):
                     if MIN_TRANS_DIST_TO_USE_ROT < dist_from_goal: # if far, add cost proportional to distance to waypoint
                         final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2)
-                        print("local_paths[self.horizon_timesteps,:,:]", local_paths[self.horizon_timesteps,:,:])
-                        print("final_point",final_point)
+                        #print("local_paths[self.horizon_timesteps,:,:]", local_paths[self.horizon_timesteps,:,:])
+                        #print("final_point",final_point)
                         final_cost[i] += np.linalg.norm(final_point - self.cur_goal[:2].reshape(1,2)) 
                     else: # if close to waypoint in cartesian space, factor in angle
                         final_cost[1] += (local_paths[-1,valid_opts[i],2]-self.cur_goal[2])*ROT_DIST_MULT
