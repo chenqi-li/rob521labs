@@ -128,8 +128,8 @@ class PathFollower():
 
             print("TO DO: Propogate the trajectory forward, storing the resulting points in local_paths!")
             # propogate trajectory forward, assuming perfect control of velocity and no dynamic effects
-            for t in range(1, self.horizon_timesteps + 1): # for each timestep:
-                for i in range(0, self.num_opts-1): # for each control option:
+            for t in range(0, self.horizon_timesteps): # for each timestep:
+                for i in range(0, self.num_opts): # for each control option:
                     # Given your chosen velocities determine the trajectory of the robot for your given timestep
                     # The returned trajectory should be a series of points to check for collisions
                     p = self.all_opts_scaled[i,:].reshape(2,1)
@@ -139,9 +139,8 @@ class PathFollower():
                                     [0, 1]])
                     q_dot = np.matmul(G,p)
                     #print(q_dot)
-                    #print(local_paths[t,i,:])
                     #local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot
-                    local_paths[t,i+1,:] = local_paths[t,i,:] + q_dot.squeeze()
+                    local_paths[t+1,i,:] = local_paths[t,i,:] + q_dot.reshape(1,1,3)
 
             # check all trajectory points for collisions
             # first find the closest collision point in the map to each local path point
@@ -167,8 +166,9 @@ class PathFollower():
 
             # remove trajectories that were deemed to have collisions
             print("TO DO: Remove trajectories with collisions!")
-            valid_paths = local_paths[:,uncollided_opts,:]
+            #valid_paths = local_paths[:,uncollided_opts,:]
             valid_opts = [valid_opts[idx] for idx in uncollided_opts]
+            print("valid_opts",valid_opts)
 
             # calculate final cost and choose best option
             print("TO DO: Calculate the final cost and choose the best control option!")
@@ -177,13 +177,19 @@ class PathFollower():
                 control = [-.1, 0]
             else:
                 print("Current goal is:",self.cur_goal[:2])
+                dist_from_goal = np.linalg.norm(self.pose_in_map_np[:2] - self.cur_goal[:2])
+                print("Dist from goal:",dist_from_goal)
                 for i in range(0,len(valid_opts)):
-                    # add cost proportional to distance to waypoint
-                    final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2) + self.map_origin[:2].reshape(1,2)
-                    #print("Final point for option",valid_opts[i],"is",final_point)
-                    final_cost[i] += np.linalg.norm(final_point - self.cur_goal[:2].reshape(1,2))
+                    if MIN_TRANS_DIST_TO_USE_ROT < dist_from_goal: # if far, add cost proportional to distance to waypoint
+                        final_point = local_paths[-1,valid_opts[i],:2].reshape(1,2)
+                        print("local_paths[self.horizon_timesteps,:,:]", local_paths[self.horizon_timesteps,:,:])
+                        print("final_point",final_point)
+                        final_cost[i] += np.linalg.norm(final_point - self.cur_goal[:2].reshape(1,2)) 
+                    else: # if close to waypoint in cartesian space, factor in angle
+                        final_cost[1] += (local_paths[-1,valid_opts[i],2]-self.cur_goal[2])*ROT_DIST_MULT
+
                 
-                #print(final_cost)
+                print("final_cost",final_cost)
                 best_opt = valid_opts[final_cost.argmin()]
                 control = self.all_opts[best_opt]
                 self.local_path_pub.publish(utils.se2_pose_list_to_path(local_paths[:, best_opt], 'map'))
@@ -207,6 +213,7 @@ class PathFollower():
         self.collision_marker.header.stamp = rospy.Time.now()
         self.collision_marker.pose = utils.pose_from_se2_pose(self.pose_in_map_np)
         self.collision_marker_pub.publish(self.collision_marker)
+        print("Pose updated:",self.pose_in_map_np)
 
     def check_and_update_goal(self):
         # iterate the goal if necessary
