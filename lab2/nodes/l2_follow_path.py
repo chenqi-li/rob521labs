@@ -155,7 +155,8 @@ class PathFollower():
                 uncollided = True
                 for timestep in range(local_paths_pixels.shape[0]):
                     point = local_paths_pixels[timestep, opt, :]
-                    rr, cc = disk(point,COLLISION_RADIUS,shape=map_shape)
+                    rr, cc = disk(point, np.ceil(self.collision_radius_pix).astype(int) ,shape=map_shape)
+                    # rr, cc = disk(point,COLLISION_RADIUS,shape=map_shape)
                     if np.any(self.map_np[rr,cc]):
                         #print("Option",opt,"is collided.")
                         uncollided = False
