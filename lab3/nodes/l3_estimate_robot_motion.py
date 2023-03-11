@@ -48,6 +48,9 @@ class WheelOdom:
         self.last_enc_r = None
         self.last_time = None
 
+        # Added Variables
+        self.mu_prev = np.zeros((3,1))
+
         # rosbag
         rospack = rospkg.RosPack()
         path = rospack.get_path("rob521_lab3")
@@ -80,14 +83,28 @@ class WheelOdom:
             # # YOUR CODE HERE!!!
             # Update your odom estimates with the latest encoder measurements and populate the relevant area
             # of self.pose and self.twist with estimated position, heading and velocity
+            r = WHEEL_RADIUS
+            b = BASELINE
+            theta = self.mu_prev[2].item()
 
-            # self.pose.position.x = xx
-            # self.pose.position.y = xx
-            # self.pose.orientation = xx
+            del_l = le - self.last_enc_l
+            del_r = re - self.last_enc_r
+            
+            mu = self.mu_prev + np.array([[np.cos(theta), 0], [np.sin(theta), 0], [0, 1]])@np.array([[r/2,r/2],[r/(2*b),-r/(2*b)]])@np.array([[del_r],[del_l]])
+            mu_dot = mu - self.mu_prev
 
-            # self.twist.linear.x = mu_dot[0].item()
-            # self.twist.linear.y = mu_dot[1].item()
-            # self.twist.angular.z = mu_dot[2].item()
+            self.pose.position.x = mu[0].item()
+            self.pose.position.y = mu[1].item()
+            self.pose.orientation = mu[2].item()
+
+            self.twist.linear.x = mu_dot[0].item()
+            self.twist.linear.y = mu_dot[1].item()
+            self.twist.angular.z = mu_dot[2].item()
+            
+            self.last_enc_l = sensor_state_msg.left_encoder
+            self.last_enc_r = sensor_state_msg.right_encoder
+            self.last_time = sensor_state_msg.header.stamp
+            self.mu_prev = mu
 
             # publish the updates as a topic and in the tf tree
             current_time = rospy.Time.now()
