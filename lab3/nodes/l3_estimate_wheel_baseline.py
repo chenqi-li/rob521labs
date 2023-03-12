@@ -8,10 +8,12 @@ from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 
 INT32_MAX = 2**31
-DRIVEN_DISTANCE = 0.75 #in meters
+NUM_ROTATIONS = 3 
 TICKS_PER_ROTATION = 4096
+WHEEL_RADIUS = 0.066 / 2 #In meters
 
-class wheelRadiusEstimator():
+
+class wheelBaselineEstimator():
     def __init__(self):
         rospy.init_node('encoder_data', anonymous=True) # Initialize node
 
@@ -65,20 +67,18 @@ class wheelRadiusEstimator():
         return
 
     def startStopCallback(self, msg):
-        input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
-        if self.isMoving is False and np.absolute(input_velocity_mag) > 0:
+        if self.isMoving is False and np.absolute(msg.angular.z) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
 
-        elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
+        elif self.isMoving is True and np.isclose(msg.angular.z, 0):
             self.isMoving = False #Set the state to stopped
 
-            # # YOUR CODE HERE!!!
+            # YOUR CODE HERE!!!
             # Calculate the radius of the wheel based on encoder measurements
 
-            radius = (2*DRIVEN_DISTANCE)/(self.del_left_encoder+self.del_right_encoder)
-
-            print('Calibrated Radius: {} m'.format(radius))
+            separation = (WHEEL_RADIUS/2)*(self.del_right_encoder-self.del_left_encoder)/(NUM_ROTATIONS*2*np.pi)
+            print('Calibrated Separation: {} m'.format(separation))
 
             #Reset the robot and calibration routine
             self.lock.acquire()
@@ -95,5 +95,5 @@ class wheelRadiusEstimator():
 
 
 if __name__ == '__main__':
-    Estimator = wheelRadiusEstimator() #create instance
+    Estimator = wheelBaselineEstimator() #create instance
     rospy.spin()
