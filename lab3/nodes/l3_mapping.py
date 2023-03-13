@@ -94,6 +94,17 @@ class OccupancyGripMap:
 
         # YOUR CODE HERE!!! Loop through each measurement in scan_msg to get the correct angle and
         # x_start and y_start to send to your ray_trace_update function.
+        for i in range(0, len(scan_msg.ranges), SCAN_DOWNSAMPLE):
+            if scan_msg.range_min < scan_msg.ranges[i] <  scan_msg.range_max:
+
+                angle = odom_map[2] + i * scan_msg.angle_increment
+                x_start = odom_map[0]
+                y_start = odom_map[1]
+                self.np_map, self.log_odds = self.ray_trace_update(self.np_map, self.log_odds, x_start, y_start, angle, scan_msg.ranges[i])
+
+
+
+        
 
         # publish the message
         self.map_msg.info.map_load_time = rospy.Time.now()
@@ -115,6 +126,69 @@ class OccupancyGripMap:
         # YOUR CODE HERE!!! You should modify the log_odds object and the numpy map based on the outputs from
         # ray_trace and the equations from class. Your numpy map must be an array of int8s with 0 to 100 representing
         # probability of occupancy, and -1 representing unknown.
+        x_end = x_start + range_mes * np.cos(angle)
+        y_end = y_start + range_mes * np.sin(angle)
+
+        #opstacles
+        obstacles = NUM_PTS_OBSTACLE*CELL_SIZE + range_mes
+
+        #ray trace
+        x_end_op = x_start + obstacles * np.cos(angle)
+        y_end_op = y_start + obstacles * np.sin(angle)
+
+        #convert to map coordinates
+        x_start = int(x_start / CELL_SIZE)
+        y_start = int(y_start / CELL_SIZE)
+        x_end = int(x_end / CELL_SIZE)
+        y_end = int(y_end / CELL_SIZE)
+        x_end_op = int(x_end_op / CELL_SIZE)
+        y_end_op = int(y_end_op / CELL_SIZE)
+
+        #shape
+        map_x, map_y = map.shape
+
+
+        #ray trace
+        free_rr, free_cc = ray_trace(y_start, x_start, y_end, x_end)
+        op_rr, op_cc = ray_trace(y_end, x_end, y_end_op, x_end_op)
+
+        #remove negative index
+        temp_rr = free_rr[free_rr >= 0]
+        temp_cc = free_cc[free_rr >= 0]
+        free_rr = temp_rr[temp_cc >= 0]
+        free_cc = temp_cc[temp_cc >= 0]
+
+        temp_rr = op_rr[op_rr >= 0]
+        temp_cc = op_cc[op_rr >= 0]
+        op_rr = temp_rr[temp_cc >= 0]
+        op_cc = temp_cc[temp_cc >= 0]
+
+        #remove out of bound index
+        temp_rr = free_rr[free_rr < map_x]
+        temp_cc = free_cc[free_rr < map_x]
+        free_rr = temp_rr[temp_cc < map_y]
+        free_cc = temp_cc[temp_cc < map_y]
+
+        temp_rr = op_rr[op_rr < map_x]
+        temp_cc = op_cc[op_rr < map_x]
+        op_rr = temp_rr[temp_cc < map_y]
+        op_cc = temp_cc[temp_cc < map_y]
+
+
+
+        #update map
+        ray_map = np.zeros((map_x, map_y))
+        ray_map[free_rr, free_cc] = -BETA
+        ray_map[op_rr, op_cc] = ALPHA
+
+        #update log odds
+        log_odds += ray_map
+
+        #probability
+        return self.log_odds_to_probability(log_odds), log_odds
+
+
+
 
         return map, log_odds
 
