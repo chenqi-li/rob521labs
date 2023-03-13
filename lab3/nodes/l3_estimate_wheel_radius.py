@@ -30,11 +30,12 @@ class wheelRadiusEstimator():
         self.isMoving = False #Moving or not moving
         self.lock = threading.Lock()
 
-        #Reset the robot 
+        #Reset the robot
+        self.lock.acquire()
+        self.lock.release()
         reset_msg = Empty()
         self.reset_pub.publish(reset_msg)
         print('Ready to start wheel radius calibration!')
-        return
 
     def safeDelPhi(self, a, b):
         #Need to check if the encoder storage variable has overflowed
@@ -50,9 +51,12 @@ class wheelRadiusEstimator():
     def sensorCallback(self, msg):
         #Retrieve the encoder data form the sensor state msg
         self.lock.acquire()
-        if self.left_encoder_prev is None or self.left_encoder_prev is None: 
+        #print("Left Encoder",msg.left_encoder)
+        #print("Right Encoder",msg.right_encoder)
+        if self.left_encoder_prev is None or self.right_encoder_prev is None: 
             self.left_encoder_prev = msg.left_encoder #int32
             self.right_encoder_prev = msg.right_encoder #int32
+
         else:
             #Calculate and integrate the change in encoder value
             self.del_left_encoder += self.safeDelPhi(self.left_encoder_prev, msg.left_encoder)
@@ -67,16 +71,25 @@ class wheelRadiusEstimator():
     def startStopCallback(self, msg):
         input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
         if self.isMoving is False and np.absolute(input_velocity_mag) > 0:
+            
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
+            
+            self.left_encoder_prev = None
+            self.right_encoder_prev = None
+            self.del_left_encoder = 0
+            self.del_right_encoder = 0
 
         elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
             self.isMoving = False #Set the state to stopped
+            
 
             # # YOUR CODE HERE!!!
             # Calculate the radius of the wheel based on encoder measurements
+            del_ang_l = abs(self.del_left_encoder*2*np.pi/TICKS_PER_ROTATION)
+            del_ang_r = abs(self.del_right_encoder*2*np.pi/TICKS_PER_ROTATION)
 
-            radius = (2*DRIVEN_DISTANCE)/(self.del_left_encoder+self.del_right_encoder)
+            radius = (2*DRIVEN_DISTANCE)/(del_ang_l+del_ang_r)
 
             print('Calibrated Radius: {} m'.format(radius))
 
@@ -90,6 +103,12 @@ class wheelRadiusEstimator():
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
             print('Resetted the robot to calibrate again!')
+            print("Left_Encoder_Previous:", self.left_encoder_prev)
+            print("Right_Encoder_Previous:", self.right_encoder_prev)
+            print("Del_Left_Encoder:", self.del_left_encoder)
+            print("Del_Right_Encoder:", self.del_right_encoder)
+            print("Moving?", self.isMoving)
+            
 
         return
 
