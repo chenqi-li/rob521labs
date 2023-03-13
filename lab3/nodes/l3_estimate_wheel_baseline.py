@@ -70,14 +70,22 @@ class wheelBaselineEstimator():
         if self.isMoving is False and np.absolute(msg.angular.z) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
+            
+            self.left_encoder_prev = None
+            self.right_encoder_prev = None
+            self.del_left_encoder = 0
+            self.del_right_encoder = 0
 
         elif self.isMoving is True and np.isclose(msg.angular.z, 0):
             self.isMoving = False #Set the state to stopped
 
             # YOUR CODE HERE!!!
             # Calculate the radius of the wheel based on encoder measurements
+            
+            del_ang_l = abs(self.del_left_encoder*2*np.pi/TICKS_PER_ROTATION)
+            del_ang_r = abs(self.del_right_encoder*2*np.pi/TICKS_PER_ROTATION)
 
-            separation = (WHEEL_RADIUS/2)*(self.del_right_encoder-self.del_left_encoder)/(NUM_ROTATIONS*2*np.pi)
+            separation = (WHEEL_RADIUS/2)*(self.del_ang_r-self.del_ang_l)/(NUM_ROTATIONS*2*np.pi)
             print('Calibrated Separation: {} m'.format(separation))
 
             #Reset the robot and calibration routine
