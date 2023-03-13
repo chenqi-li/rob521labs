@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-import rospy
 import numpy as np
 import threading
 from turtlebot3_msgs.msg import SensorState
@@ -103,12 +100,6 @@ class wheelRadiusEstimator():
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
             print('Resetted the robot to calibrate again!')
-            print("Left_Encoder_Previous:", self.left_encoder_prev)
-            print("Right_Encoder_Previous:", self.right_encoder_prev)
-            print("Del_Left_Encoder:", self.del_left_encoder)
-            print("Del_Right_Encoder:", self.del_right_encoder)
-            print("Moving?", self.isMoving)
-            
 
         return
 
