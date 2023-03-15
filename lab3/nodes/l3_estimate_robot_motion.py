@@ -87,15 +87,23 @@ class WheelOdom:
             b = BASELINE
             theta = self.mu_prev[2].item()
 
-            del_l = le - self.last_enc_l
-            del_r = re - self.last_enc_r
+            del_l = (le - self.last_enc_l)*RAD_PER_TICK
+            del_r = (re - self.last_enc_r)*RAD_PER_TICK
             
             mu = self.mu_prev + np.array([[np.cos(theta), 0], [np.sin(theta), 0], [0, 1]])@np.array([[r/2,r/2],[r/(2*b),-r/(2*b)]])@np.array([[del_r],[del_l]])
-            mu_dot = mu - self.mu_prev
+            
+            angle = mu[2,0]-int(mu[2,0]/(2*np.pi))
+            if angle > np.pi:
+            	angle = -(2*np.pi-angle)	
+            elif angle < -np.pi:
+            	angle = 2*np.pi+angle
+            mu[2,0] = angle
+
+            mu_dot = (mu - self.mu_prev)/(sensor_state_msg.header.stamp - self.last_time).to_sec()
 
             self.pose.position.x = mu[0].item()
             self.pose.position.y = mu[1].item()
-            self.pose.orientation = mu[2].item()
+            self.pose.orientation = ros_quat_from_euler((0,0,mu[2].item()))
 
             self.twist.linear.x = mu_dot[0].item()
             self.twist.linear.y = mu_dot[1].item()
@@ -109,12 +117,15 @@ class WheelOdom:
             self.mu_prev = mu
 
             # publish the updates as a topic and in the tf tree
-            current_time = rospy.Time.now()
-            self.wheel_odom_tf.header.stamp = current_time
+            #current_time = rospy.Time.now()
+            #print("Time", current_time)
+            #self.wheel_odom_tf.header.stamp = current_time
+            self.wheel_odom_tf.header.stamp = sensor_state_msg.header.stamp
             self.wheel_odom_tf.transform = convert_pose_to_tf(self.pose)
             self.tf_br.sendTransform(self.wheel_odom_tf)
 
-            self.wheel_odom.header.stamp = current_time
+            #self.wheel_odom.header.stamp = current_time
+            self.wheel_odom.header.stamp = sensor_state_msg.header.stamp
             self.wheel_odom.pose.pose = self.pose
             self.wheel_odom.twist.twist = self.twist
             self.wheel_odom_pub.publish(self.wheel_odom)
