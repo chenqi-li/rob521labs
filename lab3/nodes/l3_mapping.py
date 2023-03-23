@@ -98,9 +98,10 @@ class OccupancyGripMap:
             if scan_msg.range_min < scan_msg.ranges[i] <  scan_msg.range_max:
 
                 angle = odom_map[2] + i * scan_msg.angle_increment
-                x_start = odom_map[0]
-                y_start = odom_map[1]
-                self.np_map, self.log_odds = self.ray_trace_update(self.np_map, self.log_odds, x_start, y_start, angle, scan_msg.ranges[i])
+                x_start = odom_map[0] / CELL_SIZE
+                y_start = odom_map[1] / CELL_SIZE
+                range_msg = scan_msg.ranges[i] / CELL_SIZE
+                self.np_map, self.log_odds = self.ray_trace_update(self.np_map, self.log_odds, x_start, y_start, angle, range_msg)
 
 
 
@@ -123,6 +124,7 @@ class OccupancyGripMap:
         :param range_mes: The range of the measurement along the ray.
         :return: The numpy map and the log odds updated along a single ray.
         """
+        #print("hi")
         # YOUR CODE HERE!!! You should modify the log_odds object and the numpy map based on the outputs from
         # ray_trace and the equations from class. Your numpy map must be an array of int8s with 0 to 100 representing
         # probability of occupancy, and -1 representing unknown.
@@ -130,19 +132,19 @@ class OccupancyGripMap:
         y_end = y_start + range_mes * np.sin(angle)
 
         #opstacles
-        obstacles = NUM_PTS_OBSTACLE*CELL_SIZE + range_mes
+        obstacles = NUM_PTS_OBSTACLE + range_mes
 
         #ray trace
         x_end_op = x_start + obstacles * np.cos(angle)
         y_end_op = y_start + obstacles * np.sin(angle)
 
         #convert to map coordinates
-        x_start = int(x_start / CELL_SIZE)
-        y_start = int(y_start / CELL_SIZE)
-        x_end = int(x_end / CELL_SIZE)
-        y_end = int(y_end / CELL_SIZE)
-        x_end_op = int(x_end_op / CELL_SIZE)
-        y_end_op = int(y_end_op / CELL_SIZE)
+        x_start = int(x_start)
+        y_start = int(y_start)
+        x_end = int(x_end)
+        y_end = int(y_end)
+        x_end_op = int(x_end_op)
+        y_end_op = int(y_end_op)
 
         #shape
         map_x, map_y = map.shape
@@ -177,19 +179,37 @@ class OccupancyGripMap:
 
 
         #update map
-        ray_map = np.zeros((map_x, map_y))
-        ray_map[free_rr, free_cc] = -BETA
-        ray_map[op_rr, op_cc] = ALPHA
+        #ray_map = np.zeros((map_y, map_x))
+        #ray_map[free_rr, free_cc] = -BETA
+        #ray_map[op_rr, op_cc] = ALPHA
 
         #update log odds
-        log_odds += ray_map
+        #log_odds +=ray_map
+        log_odds[free_rr, free_cc] -= BETA
+        log_odds[op_rr, op_cc] += ALPHA
+
+        # if log_odds[free_rr, free_cc] >= 50:
+        #     log_odds[free_rr, free_cc] = 50
+        # if log_odds[op_rr, op_cc] >= 50:
+        #     log_odds[op_rr, op_cc] = 50
+        # if log_odds[free_rr, free_cc] <= -50:
+        #     log_odds[free_rr, free_cc] = -50
+        # if log_odds[op_rr, op_cc] <= -50:   
+        #     log_odds[op_rr, op_cc] = -50
+
+        log_odds[log_odds>50] = 50
+        log_odds[log_odds<-50] = -50
+        
 
         #probability
-        return self.log_odds_to_probability(log_odds), log_odds
-
-
-
-
+        # if op_rr.size != 0:
+        #     rr = np.vstack([free_rr,op_rr])
+        # if op_cc.size != 0:
+        #     cc = np.vstack([free_cc,op_cc])
+        rr = np.concatenate((free_rr,op_rr))
+        cc = np.concatenate((free_cc,op_cc))
+        map[rr, cc] = (self.log_odds_to_probability(log_odds[rr, cc])*100).astype(np.int8)
+        
         return map, log_odds
 
     def log_odds_to_probability(self, values):

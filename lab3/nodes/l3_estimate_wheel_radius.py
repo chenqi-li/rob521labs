@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+import rospy
 import numpy as np
 import threading
 from turtlebot3_msgs.msg import SensorState
@@ -5,7 +8,7 @@ from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 
 INT32_MAX = 2**31
-DRIVEN_DISTANCE = 0.75 #in meters
+DRIVEN_DISTANCE = 1.22 #in meters
 TICKS_PER_ROTATION = 4096
 
 class wheelRadiusEstimator():
@@ -100,6 +103,7 @@ class wheelRadiusEstimator():
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
             print('Resetted the robot to calibrate again!')
+
 
         return
 
